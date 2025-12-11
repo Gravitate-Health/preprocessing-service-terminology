@@ -15,21 +15,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: preprocessing-service-mvp2
+  name: preprocessing-service-terminology
 
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: preprocessing-service-mvp2
+      app: preprocessing-service-terminology
   template:
     metadata:
       labels:
-        app: preprocessing-service-mvp2
+        app: preprocessing-service-terminology
     spec:
       containers:
-      - name: preprocessing-service-mvp2
-        image: gravitate-registry.cr.de-fra.ionos.com/preprocessing-service-mvp2:latest
+      - name: preprocessing-service-terminology
+        image: gravitate-registry.cr.de-fra.ionos.com/preprocessing-service-terminology:latest
         imagePullPolicy: Always
         env:
         - name: ENVIRONMENT

@@ -4,4 +4,4 @@ resources:
 - ../base
 
 patches:
-- path: 002_preprocessing-service-mvp2-deployment.yaml
+- path: 002_preprocessing-service-terminology-deployment.yaml
