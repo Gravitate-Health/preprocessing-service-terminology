@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: preprocessing-service-terminology
-        image: gravitate-registry.cr.de-fra.ionos.com/preprocessing-service-terminology:latest
+        image: ghcr.io/gravitate-health/preprocessing-service-terminology:latest
         imagePullPolicy: Always
         env:
         - name: ENVIRONMENT
