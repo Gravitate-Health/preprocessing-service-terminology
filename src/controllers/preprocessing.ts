@@ -27,14 +27,16 @@ const getLeaflet = (epi: any) => {
 }
 
 const getSnomedCodes = async (terminologyType: string) => {
-    const snomedCodes = await axios.get(`${process.env.TERM_SERVER_URL}/${terminologyType}/all`)
-        .then((response) => {
-            return response.data
-        })
-        .catch((error) => {
-            Logger.logError('preprocessing.ts', 'getSnomedCodes', () => error)
-        })
-    return snomedCodes
+    try {
+        if (!process.env.TERM_SERVER_URL) {
+            throw new Error('TERM_SERVER_URL environment variable is not set')
+        }
+        const response = await axios.get(`${process.env.TERM_SERVER_URL}/${terminologyType}/all`)
+        return response.data
+    } catch (error) {
+        Logger.logError('preprocessing.ts', 'getSnomedCodes', () => `Failed to fetch terminology codes from ${process.env.TERM_SERVER_URL}/${terminologyType}/all: ${error}`)
+        throw error
+    }
 }
 
 function annotationProcess(divString: string, code: object, JSDOM: any) {
@@ -173,8 +175,15 @@ export const preprocess = async (req: Request, res: Response) => {
             const terminologyList = await getSnomedCodes(terminologyType)
             snomedCodes = snomedCodes.concat(terminologyList)
         }
-    } catch (error) {
-        res.status(500).send('Failed getting Snomed Codes')
+    } catch (error: any) {
+        Logger.logError('preprocessing.ts', 'preprocess', () => `Terminology server error: ${error.message || error}`)
+        if (error.code === 'ECONNREFUSED') {
+            res.status(503).send(`Terminology server unavailable at ${process.env.TERM_SERVER_URL}`)
+        } else if (error.message?.includes('TERM_SERVER_URL')) {
+            res.status(500).send('TERM_SERVER_URL environment variable is not configured')
+        } else {
+            res.status(500).send('Failed to fetch terminology codes')
+        }
         return
     }
 
