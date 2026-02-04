@@ -22,20 +22,34 @@ const snomedEndpointList = [
 ]
 
 const getLeaflet = (epi: any) => {
-    let leafletSectionList = epi['entry'][0]['resource']['section'][0]['section']
+    const resource = epi?.entry?.[0]?.resource
+    if (!resource?.section || !Array.isArray(resource.section) || resource.section.length === 0) {
+        throw new Error('Invalid ePI structure: missing or empty section array')
+    }
+    const leafletSectionList = resource.section[0]?.section
+    if (!leafletSectionList) {
+        throw new Error('Invalid ePI structure: missing Package Leaflet section')
+    }
     return leafletSectionList
 }
 
-const getSnomedCodes = async (terminologyType: string) => {
+const getSnomedCodes = async (terminologyType: string): Promise<{ success: boolean, data: any[], statusCode?: number }> => {
     try {
         if (!process.env.TERM_SERVER_URL) {
             throw new Error('TERM_SERVER_URL environment variable is not set')
         }
         const response = await axios.get(`${process.env.TERM_SERVER_URL}/${terminologyType}/all`)
-        return response.data
-    } catch (error) {
-        Logger.logError('preprocessing.ts', 'getSnomedCodes', () => `Failed to fetch terminology codes from ${process.env.TERM_SERVER_URL}/${terminologyType}/all: ${error}`)
-        throw error
+        return { success: true, data: response.data }
+    } catch (error: any) {
+        const statusCode = error.response?.status
+        const errorMsg = error.response?.status === 503 
+            ? 'Terminology server unavailable (503)'
+            : error.code === 'ECONNREFUSED'
+            ? 'Terminology server connection refused'
+            : `Failed to fetch terminology codes: ${error.message || error}`
+        
+        Logger.logError('preprocessing.ts', 'getSnomedCodes', () => `${errorMsg} from ${process.env.TERM_SERVER_URL}/${terminologyType}/all`)
+        return { success: false, data: [], statusCode }
     }
 }
 
@@ -94,13 +108,19 @@ function recursiveTreeWalker(nodeList: any, code: any, document: any) {
 }
 
 const addSemmanticAnnotation = (leafletSectionList: any[], snomedCodes: any[], JSDOM: any) => {
-    leafletSectionList.forEach((section) => {
-        snomedCodes.forEach((code) => {
+    leafletSectionList.forEach((section) => {        if (!section?.text?.div) {
+            Logger.logWarn('preprocessing.ts', 'addSemmanticAnnotation', 'Section missing text.div field, skipping')
+            if (section?.section) {
+                addSemmanticAnnotation(section.section, snomedCodes, JSDOM)
+            }
+            return
+        }
+                snomedCodes.forEach((code) => {
             const divString: string = section['text']['div']
             if (section.section != undefined) {
                 addSemmanticAnnotation(section.section, snomedCodes, JSDOM)
             }
-                if (code[descriptionLang] != undefined || code[descriptionLang] != null || code[descriptionLang] != "") {
+                if (code[descriptionLang] != undefined && code[descriptionLang] != null && code[descriptionLang] != "") {
                 const divStringLC = divString.toLowerCase();
                 Logger.logDebug('preprocessing.ts', 'addSemmanticAnnotation', () => `Now using this divstring: ${divString}`)
                 Logger.logDebug('preprocessing.ts', 'addSemmanticAnnotation', () => `Now using this divstring in lowercase: ${divStringLC}`)
@@ -162,29 +182,50 @@ export const preprocess = async (req: Request, res: Response) => {
     JSDOM = jsdom.JSDOM;
     let epi = req.body;
     codesFound = []
+    
+    // Validate ePI structure
+    if (!epi || !epi.entry || !Array.isArray(epi.entry) || epi.entry.length === 0) {
+        Logger.logError('preprocessing.ts', 'preprocess', 'Invalid ePI structure: missing entry array')
+        res.status(400).send('Bad Payload: Invalid ePI structure')
+        return
+    }
+    
+    const resource = epi.entry[0]?.resource
+    if (!resource) {
+        Logger.logError('preprocessing.ts', 'preprocess', 'Invalid ePI structure: missing resource')
+        res.status(400).send('Bad Payload: Invalid ePI resource structure')
+        return
+    }
+    
+    if (!resource.language) {
+        Logger.logError('preprocessing.ts', 'preprocess', 'Invalid ePI structure: missing language')
+        res.status(400).send('Bad Payload: Missing language field')
+        return
+    }
+    
     Logger.logInfo('preprocessing.ts', 'preprocess', () => `Received ePI with Length: ${JSON.stringify(epi).length}`)
     Logger.logInfo('preprocessing.ts', 'preprocess', `queried /preprocess function with epi ID: ${JSON.stringify(epi['id'])}`)
-    Logger.logDebug('preprocessing.ts', 'preprocess', () => `Language: ${epi['entry'][0]['resource']['language'].toLowerCase()}`)
+    Logger.logDebug('preprocessing.ts', 'preprocess', () => `Language: ${resource.language.toLowerCase()}`)
 
-    descriptionLang = `descr_${epi['entry'][0]['resource']['language'].toLowerCase()}`
+    descriptionLang = `descr_${resource.language.toLowerCase()}`
 
     let leafletSectionList
     let snomedCodes: any[] = []
-    try {
-        for (let terminologyType of snomedEndpointList) {
-            const terminologyList = await getSnomedCodes(terminologyType)
-            snomedCodes = snomedCodes.concat(terminologyList)
-        }
-    } catch (error: any) {
-        Logger.logError('preprocessing.ts', 'preprocess', () => `Terminology server error: ${error.message || error}`)
-        if (error.code === 'ECONNREFUSED') {
-            res.status(503).send(`Terminology server unavailable at ${process.env.TERM_SERVER_URL}`)
-        } else if (error.message?.includes('TERM_SERVER_URL')) {
-            res.status(500).send('TERM_SERVER_URL environment variable is not configured')
+    let terminologyServerFailed = false
+    
+    // Try to fetch terminology codes, but continue gracefully if it fails
+    for (let terminologyType of snomedEndpointList) {
+        const result = await getSnomedCodes(terminologyType)
+        if (result.success) {
+            snomedCodes = snomedCodes.concat(result.data)
         } else {
-            res.status(500).send('Failed to fetch terminology codes')
+            terminologyServerFailed = true
+            Logger.logWarn('preprocessing.ts', 'preprocess', `Continuing without terminology codes from ${terminologyType} endpoint`)
         }
-        return
+    }
+    
+    if (terminologyServerFailed && snomedCodes.length === 0) {
+        Logger.logWarn('preprocessing.ts', 'preprocess', 'All terminology endpoints failed - returning ePI without annotations')
     }
 
     try {
