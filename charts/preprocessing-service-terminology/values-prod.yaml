@@ -1,0 +1,48 @@
+# Production environment values for preprocessing-service-terminology
+# Usage: helm install my-release charts/preprocessing-service-terminology/ -f values-prod.yaml
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/gravitate-health/preprocessing-service-terminology
+  tag: "v0.14.0"  # Use specific version in production, not 'latest'
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+config:
+  environment: "prod"
+  # CRITICAL: Update to match your production terminology server location
+  termServerUrl: "http://terminology-service.prod.svc.cluster.local:3000"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+logging:
+  level: "INFO"
+
+# Production pod disruption budget: allow 1 unavailable during updates
+# Uncomment to enable (requires k8s 1.21+)
+# podDisruptionBudget:
+#   minAvailable: 2
+
+# Production affinity: require pods on different nodes
+# Uncomment to enable
+# affinity:
+#   podAntiAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#     - labelSelector:
+#         matchExpressions:
+#         - key: app.kubernetes.io/name
+#           operator: In
+#           values:
+#           - preprocessing-service-terminology
+#       topologyKey: "kubernetes.io/hostname"

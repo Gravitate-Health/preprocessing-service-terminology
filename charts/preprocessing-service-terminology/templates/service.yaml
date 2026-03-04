@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "preprocessing-service-terminology.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "preprocessing-service-terminology.labels" . | nindent 4 }}
+    {{- include "preprocessing-service-terminology.discoveryLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "preprocessing-service-terminology.selectorLabels" . | nindent 4 }}

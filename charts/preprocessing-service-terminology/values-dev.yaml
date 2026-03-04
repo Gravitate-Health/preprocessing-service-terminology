@@ -1,0 +1,30 @@
+# Development environment values for preprocessing-service-terminology
+# Usage: helm install my-release charts/preprocessing-service-terminology/ -f values-dev.yaml
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/gravitate-health/preprocessing-service-terminology
+  tag: "latest"  # Use latest in dev for quick updates
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+config:
+  environment: "dev"
+  # Update to match your dev terminology server location
+  termServerUrl: "http://terminology-service.default.svc.cluster.local:3000"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+logging:
+  level: "DEBUG"

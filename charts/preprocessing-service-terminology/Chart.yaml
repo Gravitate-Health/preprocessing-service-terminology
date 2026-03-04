@@ -1,0 +1,19 @@
+apiVersion: v2
+name: preprocessing-service-terminology
+description: A Helm chart for deploying the Gravitate Health Preprocessing Service for terminology annotation
+type: application
+version: 0.1.0
+appVersion: "0.8.0"
+keywords:
+  - preprocessing
+  - epi
+  - terminology
+  - fhir
+  - gravitate-health
+maintainers:
+  - name: Gravitate Health Team
+    email: info@gravitate-health.eu
+home: https://github.com/Gravitate-Health/preprocessing-service-terminology
+sources:
+  - https://github.com/Gravitate-Health/preprocessing-service-terminology
+license: Apache-2.0

@@ -1,0 +1,30 @@
+# Staging environment values for preprocessing-service-terminology
+# Usage: helm install my-release charts/preprocessing-service-terminology/ -f values-staging.yaml
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/gravitate-health/preprocessing-service-terminology
+  tag: "v0.14.0"  # Use released version for staging
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+config:
+  environment: "staging"
+  # Update to match your staging terminology server location
+  termServerUrl: "http://terminology-service.staging.svc.cluster.local:3000"
+
+resources:
+  limits:
+    cpu: 750m
+    memory: 768Mi
+  requests:
+    cpu: 375m
+    memory: 384Mi
+
+logging:
+  level: "INFO"
